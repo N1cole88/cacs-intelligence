@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     s3_secret_key: str = "minioadmin"
     s3_secure: bool = False
 
+    # CORS
+    cors_origins: list[str] = ["http://localhost:3000"]
+
     # AI
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
