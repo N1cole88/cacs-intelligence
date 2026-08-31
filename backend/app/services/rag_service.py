@@ -17,6 +17,12 @@ class RAGService:
             base_url=settings.openai_base_url,
         )
         self.chat_model = settings.chat_model
+        # Cache system prompt at initialization
+        import os
+        prompt_dir = os.path.dirname(__file__).replace("\\", "/").replace("/services", "/prompts")
+        system_prompt_path = os.path.join(prompt_dir, "rag_system.txt")
+        with open(system_prompt_path, "r") as f:
+            self.system_prompt = f.read()
 
     async def retrieve_relevant_chunks(
         self,
@@ -58,18 +64,11 @@ class RAGService:
 
         context = "\n\n---\n\n".join(context_parts)
 
-        # Load system prompt
-        import os
-        prompt_dir = os.path.dirname(__file__).replace("\\", "/").replace("/services", "/prompts")
-        system_prompt_path = os.path.join(prompt_dir, "rag_system.txt")
-        with open(system_prompt_path, "r") as f:
-            system_prompt = f.read()
-
         # Generate response
         response = await self.client.chat.completions.create(
             model=self.chat_model,
             messages=[
-                {"role": "system", "content": system_prompt},
+                {"role": "system", "content": self.system_prompt},
                 {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {query}"},
             ],
             temperature=0.7,
@@ -101,7 +100,7 @@ class RAGService:
                     SourceReference(
                         document_title=doc_title,
                         page_number=chunk.page_number,
-                        content=chunk.content[:500] + "..." if len(chunk.content) > 500 else chunk.content,
+                        content=(chunk.content[:497] + "...") if len(chunk.content) > 500 else chunk.content,
                     )
                 )
                 seen_docs.add(doc_title)
