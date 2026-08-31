@@ -1,7 +1,9 @@
 import uuid
 import os
+import logging
 from datetime import datetime
 from typing import Annotated
+import aiofiles
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +13,8 @@ from app.db.session import get_db
 from app.models.document import Document
 from app.schemas.document import DocumentResponse, DocumentUploadResponse
 from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 settings = get_settings()
@@ -28,6 +32,10 @@ async def upload_document(
             detail="Only PDF files are supported",
         )
 
+    # Validate MIME type
+    if file.content_type != "application/pdf":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Only PDF files are supported")
+
     # Generate unique ID and save file
     doc_id = uuid.uuid4()
     file_ext = os.path.splitext(file.filename)[1]
@@ -40,8 +48,14 @@ async def upload_document(
 
     # Save file
     content = await file.read()
-    with open(file_path, "wb") as f:
-        f.write(content)
+
+    # Validate file size (max 50MB)
+    MAX_FILE_SIZE = 50 * 1024 * 1024
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File too large (max 50MB)")
+
+    async with aiofiles.open(file_path, "wb") as f:
+        await f.write(content)
 
     # Create database record
     document = Document(
@@ -59,8 +73,8 @@ async def upload_document(
     try:
         from app.workers.pdf_processor import process_document
         process_document.delay(str(document.id))
-    except Exception:
-        pass  # Celery may not be running in dev
+    except Exception as e:
+        logger.warning(f"Could not queue document processing for {document.id}: {e}")
 
     return DocumentUploadResponse(id=document.id, title=document.title)
 
