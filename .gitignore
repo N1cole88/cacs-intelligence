@@ -1,5 +1,6 @@
 .hyperion/
 .vscode/
+.worktrees/
 node_modules/
 __pycache__/
 *.pyc
