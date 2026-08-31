@@ -1,0 +1,8 @@
+.hyperion/
+.vscode/
+node_modules/
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
