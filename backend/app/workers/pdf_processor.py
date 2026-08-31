@@ -28,11 +28,10 @@ async def _process_document_async(document_id: uuid.UUID):
         if not document:
             raise ValueError(f"Document {document_id} not found")
 
-        # Update status
-        document.status = "processing"
-        await db.commit()
-
         try:
+            # Update status
+            document.status = "processing"
+            await db.commit()
             # Parse PDF
             doc_service = get_document_service()
             embed_service = get_embedding_service()

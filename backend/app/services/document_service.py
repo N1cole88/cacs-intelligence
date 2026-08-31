@@ -39,7 +39,7 @@ class DocumentService:
                 page_number=page_num,
                 chapter=current_chapter,
                 section=current_section,
-                content=content if 'content' in locals() else text,
+                content="\n".join(clean_lines[1:]) if len(clean_lines) > 1 else text,
             )
 
         doc.close()
