@@ -53,18 +53,46 @@ class NewsService:
                 topics.append(topic)
         return topics if topics else ["Other"]
 
-    def _get_user_topics(self, db: AsyncSession) -> list[str]:
-        """Get user's selected topics from documents if they exist."""
-        # Check if documents exist and get their status
-        stmt = select(Document.status).limit(1)
+    async def _get_user_topics(self, db: AsyncSession) -> list[str]:
+        """Extract topics from user's uploaded documents."""
         try:
-            result = db.execute(stmt)
-            doc = result.scalar_one_or_none()
-            if doc is None:
-                return AML_TOPICS  # Default to all topics
+            # Get documents that are completed
+            stmt = select(Document).where(Document.status == "completed")
+            result = await db.execute(stmt)
+            documents = result.scalars().all()
+
+            if not documents:
+                return AML_TOPICS  # Default to all topics if no completed documents
+
+            # Try to get document chunks to extract topics
+            try:
+                from app.models.chunk import DocumentChunk
+                stmt = select(DocumentChunk.content).join(Document).where(
+                    Document.status == "completed"
+                ).limit(100)
+                result = await db.execute(stmt)
+                chunks = result.scalars().all()
+
+                if not chunks:
+                    return AML_TOPICS
+
+                # Analyze chunks to find matching topics
+                topic_counts = {topic: 0 for topic in AML_TOPICS}
+                for chunk in chunks:
+                    chunk_lower = chunk.lower()
+                    for topic, keywords in TOPIC_KEYWORDS.items():
+                        if any(kw in chunk_lower for kw in keywords):
+                            topic_counts[topic] += 1
+
+                # Return topics that appear in documents
+                found_topics = [topic for topic, count in topic_counts.items() if count > 0]
+                return found_topics if found_topics else AML_TOPICS
+
+            except Exception:
+                return AML_TOPICS
+
         except Exception:
             return AML_TOPICS  # Table doesn't exist, use defaults
-        return AML_TOPICS
 
     async def fetch_newsapi(self, query: str = "money laundering OR AML OR KYC") -> list[dict]:
         """Fetch from NewsAPI."""
@@ -210,7 +238,7 @@ class NewsService:
     async def update_relevance_scores(self, db: AsyncSession) -> int:
         """Update relevance scores based on topic matching."""
         # Get user's topics
-        user_topics = self._get_user_topics(db)
+        user_topics = await self._get_user_topics(db)
 
         # Get all articles
         stmt = select(NewsArticle)

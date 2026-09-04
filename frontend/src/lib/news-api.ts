@@ -55,6 +55,12 @@ export async function calculateRelevance(): Promise<{ articles_updated: number }
   return res.json();
 }
 
+export async function getUserTopics(): Promise<{ topics: string[] }> {
+  const res = await fetch(`${API_URL}/api/news/user/topics`);
+  if (!res.ok) throw new Error("Failed to fetch user topics");
+  return res.json();
+}
+
 export async function getNewsSources(): Promise<NewsSource[]> {
   const res = await fetch(`${API_URL}/api/news/sources/list`);
   if (!res.ok) throw new Error("Failed to fetch sources");

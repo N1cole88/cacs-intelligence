@@ -76,6 +76,16 @@ async def calculate_relevance(
     return {"message": "Relevance scores updated", "articles_updated": count}
 
 
+@router.get("/user/topics")
+async def get_user_topics(
+    db: AsyncSession = Depends(get_db),
+    service: NewsService = Depends(get_news_service),
+):
+    """Get topics extracted from user's uploaded documents."""
+    topics = await service._get_user_topics(db)
+    return {"topics": topics}
+
+
 @router.get("/sources/list", response_model=list[NewsSourceResponse])
 async def get_sources(
     db: AsyncSession = Depends(get_db),

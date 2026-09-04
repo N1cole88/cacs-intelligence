@@ -1,8 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
-import { fetchNews, refreshNews, calculateRelevance, NewsArticle } from "@/lib/news-api";
+import { fetchNews, refreshNews, calculateRelevance, getUserTopics, NewsArticle } from "@/lib/news-api";
 import { NewsCard } from "@/components/NewsCard";
-import { RefreshCw, Filter, LayoutGrid, List, BarChart3 } from "lucide-react";
+import { RefreshCw, Filter, LayoutGrid, List, BarChart3, BookOpen } from "lucide-react";
 
 const TOPICS = [
   "All",
@@ -28,24 +28,33 @@ export default function NewsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [userTopics, setUserTopics] = useState<string[]>([]);
 
   // Filters
   const [view, setView] = useState("timeline");
   const [source, setSource] = useState("all");
   const [topic, setTopic] = useState("All");
 
+  // Load user topics and calculate relevance on mount
+  useEffect(() => {
+    const initNews = async () => {
+      try {
+        // Get user topics from documents
+        const { topics } = await getUserTopics();
+        setUserTopics(topics);
+
+        // Calculate relevance based on user's documents
+        await calculateRelevance();
+      } catch (err) {
+        console.error("Failed to initialize news:", err);
+      }
+    };
+    initNews();
+  }, []);
+
   const loadNews = async () => {
     setLoading(true);
     try {
-      // Calculate relevance if switching to relevance view
-      if (view === "relevance") {
-        try {
-          await calculateRelevance();
-        } catch (e) {
-          console.error("Failed to calculate relevance:", e);
-        }
-      }
-
       const params: Record<string, string> = { view };
       if (source !== "all") params.source = source;
       if (topic !== "All") params.topic = topic;
@@ -63,6 +72,8 @@ export default function NewsPage() {
     setRefreshing(true);
     try {
       await refreshNews();
+      // Recalculate relevance after refresh
+      await calculateRelevance();
       await loadNews();
     } catch (err) {
       console.error("Failed to refresh news:", err);
@@ -105,6 +116,24 @@ export default function NewsPage() {
             <h1 className="text-xl font-bold">Financial News</h1>
             {lastUpdated && (
               <p className="text-sm text-gray-500">Last updated: {lastUpdated}</p>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            {userTopics.length > 0 && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <BookOpen className="w-4 h-4" />
+                <span>Your topics:</span>
+                <div className="flex gap-1">
+                  {userTopics.slice(0, 3).map((topic) => (
+                    <span key={topic} className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">
+                      {topic}
+                    </span>
+                  ))}
+                  {userTopics.length > 3 && (
+                    <span className="text-xs text-gray-500">+{userTopics.length - 3}</span>
+                  )}
+                </div>
+              </div>
             )}
           </div>
           <button

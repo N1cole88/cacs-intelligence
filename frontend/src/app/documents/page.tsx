@@ -1,13 +1,29 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Upload, FileText, CheckCircle, XCircle, Loader2 } from "lucide-react";
-import { uploadDocument } from "@/lib/api";
+import { uploadDocument, listDocuments } from "@/lib/api";
 import type { Document } from "@/types";
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load documents on mount
+  useEffect(() => {
+    const loadDocuments = async () => {
+      try {
+        const docs = await listDocuments();
+        setDocuments(docs);
+      } catch (err) {
+        console.error("Failed to load documents:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDocuments();
+  }, []);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
