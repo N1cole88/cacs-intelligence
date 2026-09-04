@@ -13,11 +13,30 @@ from app.db.session import get_db
 from app.models.document import Document
 from app.schemas.document import DocumentResponse, DocumentUploadResponse
 from app.config import get_settings
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 settings = get_settings()
+
+_executor = ThreadPoolExecutor(max_workers=2)
+
+
+def _process_document_task(document_id: uuid.UUID, file_path: str):
+    """Run async processing in a new thread with its own event loop."""
+    import asyncio
+
+    async def _process():
+        from app.workers.pdf_processor import _process_document_async
+        await _process_document_async(document_id, file_path)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_process())
+    finally:
+        loop.close()
 
 
 @router.post("", response_model=DocumentUploadResponse)
@@ -69,10 +88,10 @@ async def upload_document(
     await db.commit()
     await db.refresh(document)
 
-    # Process document - call async function directly (we're already in async context)
+    # Process document in thread pool (to avoid event loop issues)
     try:
-        from app.workers.pdf_processor import process_document_sync
-        process_document_sync(document.id, file_path)
+        future = _executor.submit(_process_document_task, document.id, file_path)
+        future.result(timeout=120)  # Wait for completion (max 2 minutes)
         document.status = "completed"
         await db.commit()
     except Exception as e:
