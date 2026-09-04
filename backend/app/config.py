@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     chat_model: str = "gpt-4o-mini"
 
+    # News APIs
+    newsapi_api_key: str = ""
+    gnews_api_key: str = ""
+
     class Config:
         env_file = ".env"
 

@@ -1,4 +1,4 @@
-import { FileText, MessageSquare, BarChart3, BookOpen } from "lucide-react";
+import { FileText, MessageSquare, BarChart3, BookOpen, Newspaper } from "lucide-react";
 
 export default function Home() {
   return (
@@ -30,6 +30,11 @@ export default function Home() {
             <BarChart3 className="h-10 w-10 text-orange-600 mb-4" />
             <h3 className="text-lg font-semibold">Progress</h3>
             <p className="text-sm text-gray-600 mt-1">Track your mastery</p>
+          </a>
+          <a href="/news" className="p-6 bg-white rounded-lg border hover:shadow-md transition-shadow">
+            <Newspaper className="h-10 w-10 text-red-600 mb-4" />
+            <h3 className="text-lg font-semibold">News</h3>
+            <p className="text-sm text-gray-600 mt-1">Latest AML/CACS news</p>
           </a>
         </div>
         <div className="mt-12">

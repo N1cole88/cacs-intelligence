@@ -60,6 +60,8 @@ services:
       S3_SECRET_KEY: minioadmin
       S3_SECURE: "false"
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      NEWSAPI_API_KEY: 831acdcef7c2480f88a9190e3adc4caa
+      GNEWS_API_KEY: 0fa5df874e0880b8f54d3c2e99029bbc
     depends_on:
       postgres:
         condition: service_healthy
