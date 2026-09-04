@@ -68,13 +68,24 @@ export default function NewsPage() {
 
   // Group by category for category view
   const groupedArticles = view === "category"
-    ? articles.reduce((acc, article) => {
-        article.topics.forEach((t) => {
-          if (!acc[t]) acc[t] = [];
-          acc[t].push(article);
+    ? (() => {
+        const grouped = articles.reduce((acc, article) => {
+          article.topics.forEach((t) => {
+            if (!acc[t]) acc[t] = [];
+            acc[t].push(article);
+          });
+          return acc;
+        }, {} as Record<string, NewsArticle[]>);
+
+        // Sort categories alphabetically, and articles by date (newest first)
+        const sorted: Record<string, NewsArticle[]> = {};
+        Object.keys(grouped).sort().forEach((key) => {
+          sorted[key] = grouped[key].sort(
+            (a, b) => new Date(b.published_at).getTime() - new Date(a.published_at).getTime()
+          );
         });
-        return acc;
-      }, {} as Record<string, NewsArticle[]>)
+        return sorted;
+      })()
     : null;
 
   return (
