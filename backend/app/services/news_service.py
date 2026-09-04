@@ -168,9 +168,10 @@ class NewsService:
             if existing:
                 continue
 
-            # Parse date
+            # Parse date (use timezone-naive for PostgreSQL)
             try:
-                published_at = datetime.fromisoformat(article["published_at"].replace("Z", "+00:00"))
+                dt = datetime.fromisoformat(article["published_at"].replace("Z", "+00:00"))
+                published_at = dt.replace(tzinfo=None)
             except:
                 published_at = datetime.utcnow()
 
