@@ -1,13 +1,15 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Upload, FileText, CheckCircle, XCircle, Loader2 } from "lucide-react";
-import { uploadDocument, listDocuments } from "@/lib/api";
+import { Upload, FileText, CheckCircle, XCircle, Loader2, Trash2 } from "lucide-react";
+import { uploadDocument, listDocuments, deleteDocument } from "@/lib/api";
+import { calculateRelevance } from "@/lib/news-api";
 import type { Document } from "@/types";
 
 export default function DocumentsPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load documents on mount
@@ -36,6 +38,23 @@ export default function DocumentsPage() {
     finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = ""; }
   };
 
+  const handleDelete = async (docId: string) => {
+    if (!confirm("Are you sure you want to delete this document?")) return;
+
+    setDeleting(docId);
+    try {
+      await deleteDocument(docId);
+      setDocuments((prev) => prev.filter((doc) => doc.id !== docId));
+
+      // Recalculate relevance after deletion
+      await calculateRelevance();
+    } catch {
+      alert("Failed to delete document");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) { case "completed": return <CheckCircle className="w-5 h-5 text-green-600" />; case "failed": return <XCircle className="w-5 h-5 text-red-600" />; default: return <Loader2 className="w-5 h-5 text-yellow-600 animate-spin" />; }
   };
@@ -56,13 +75,35 @@ export default function DocumentsPage() {
         </div>
         <div className="bg-white rounded-lg border">
           <div className="px-6 py-4 border-b"><h2 className="font-semibold">Your Documents</h2></div>
-          {documents.length === 0 ? <div className="p-6 text-center text-gray-500">No documents uploaded yet</div> : (
+          {loading ? (
+            <div className="p-6 text-center text-gray-500">Loading...</div>
+          ) : documents.length === 0 ? (
+            <div className="p-6 text-center text-gray-500">No documents uploaded yet</div>
+          ) : (
             <div className="divide-y">
               {documents.map((doc) => (
                 <div key={doc.id} className="px-6 py-4 flex items-center gap-4">
                   <FileText className="w-8 h-8 text-gray-400" />
-                  <div className="flex-1"><p className="font-medium">{doc.title}</p><p className="text-sm text-gray-500">{new Date(doc.uploaded_at).toLocaleDateString()}</p></div>
+                  <div className="flex-1">
+                    <p className="font-medium">{doc.title}</p>
+                    <p className="text-sm text-gray-500">
+                      {new Date(doc.uploaded_at).toLocaleDateString()}
+                      {doc.status === "completed" && " • Processed"}
+                    </p>
+                  </div>
                   {getStatusIcon(doc.status)}
+                  <button
+                    onClick={() => handleDelete(doc.id)}
+                    disabled={deleting === doc.id}
+                    className="p-2 text-gray-400 hover:text-red-600 disabled:opacity-50"
+                    title="Delete document"
+                  >
+                    {deleting === doc.id ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-5 h-5" />
+                    )}
+                  </button>
                 </div>
               ))}
             </div>

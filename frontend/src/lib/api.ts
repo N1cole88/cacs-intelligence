@@ -14,6 +14,12 @@ export async function listDocuments() {
   return res.json();
 }
 
+export async function deleteDocument(id: string) {
+  const res = await fetch(`${API_URL}/api/documents/${id}`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to delete document");
+  return res.json();
+}
+
 export async function chat(message: string) {
   const res = await fetch(`${API_URL}/api/chat`, {
     method: "POST",

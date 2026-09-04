@@ -63,18 +63,23 @@ async def upload_document(
         title=file.filename,
         file_path=file_path,
         file_size=len(content),
-        status="pending",
+        status="processing",
     )
     db.add(document)
     await db.commit()
     await db.refresh(document)
 
-    # Queue background job for processing (will fail gracefully if Celery not running)
+    # Process document - call async function directly (we're already in async context)
     try:
-        from app.workers.pdf_processor import process_document
-        process_document.delay(str(document.id))
+        from app.workers.pdf_processor import process_document_sync
+        process_document_sync(document.id, file_path)
+        document.status = "completed"
+        await db.commit()
     except Exception as e:
-        logger.warning(f"Could not queue document processing for {document.id}: {e}")
+        logger.warning(f"Could not process document {document.id}: {e}")
+        document.status = "failed"
+        document.error_message = str(e)
+        await db.commit()
 
     return DocumentUploadResponse(id=document.id, title=document.title)
 
@@ -93,3 +98,27 @@ async def get_document(doc_id: uuid.UUID, db: Annotated[AsyncSession, Depends(ge
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     return document
+
+
+@router.delete("/{doc_id}")
+async def delete_document(doc_id: uuid.UUID, db: Annotated[AsyncSession, Depends(get_db)]):
+    """Delete a document and its chunks."""
+    result = await db.execute(select(Document).where(Document.id == doc_id))
+    document = result.scalar_one_or_none()
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Delete file from disk if exists
+    if document.file_path:
+        try:
+            import os
+            if os.path.exists(document.file_path):
+                os.remove(document.file_path)
+        except Exception as e:
+            logger.warning(f"Could not delete file {document.file_path}: {e}")
+
+    # Delete from database (chunks will be cascade deleted)
+    await db.delete(document)
+    await db.commit()
+
+    return {"message": "Document deleted successfully"}
