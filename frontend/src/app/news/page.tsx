@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { fetchNews, refreshNews, NewsArticle } from "@/lib/news-api";
+import { fetchNews, refreshNews, calculateRelevance, NewsArticle } from "@/lib/news-api";
 import { NewsCard } from "@/components/NewsCard";
 import { RefreshCw, Filter, LayoutGrid, List, BarChart3 } from "lucide-react";
 
@@ -37,6 +37,15 @@ export default function NewsPage() {
   const loadNews = async () => {
     setLoading(true);
     try {
+      // Calculate relevance if switching to relevance view
+      if (view === "relevance") {
+        try {
+          await calculateRelevance();
+        } catch (e) {
+          console.error("Failed to calculate relevance:", e);
+        }
+      }
+
       const params: Record<string, string> = { view };
       if (source !== "all") params.source = source;
       if (topic !== "All") params.topic = topic;

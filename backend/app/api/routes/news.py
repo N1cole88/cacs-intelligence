@@ -58,10 +58,22 @@ async def refresh_news(
 ):
     articles = await service.fetch_all_news()
     count = await service.save_articles(db, articles)
+    # Also update relevance scores based on user's documents
+    await service.update_relevance_scores(db)
     return NewsRefreshResponse(
         message="News refreshed successfully",
         articles_fetched=count,
     )
+
+
+@router.post("/calculate-relevance")
+async def calculate_relevance(
+    db: AsyncSession = Depends(get_db),
+    service: NewsService = Depends(get_news_service),
+):
+    """Calculate relevance scores based on user's uploaded documents."""
+    count = await service.update_relevance_scores(db)
+    return {"message": "Relevance scores updated", "articles_updated": count}
 
 
 @router.get("/sources/list", response_model=list[NewsSourceResponse])

@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import get_settings
 from app.models.news import NewsArticle, NewsMatch
 from app.models.document import Document
-from app.models.chunk import DocumentChunk
 
 settings = get_settings()
 
@@ -53,6 +52,19 @@ class NewsService:
             if any(kw in text for kw in keywords):
                 topics.append(topic)
         return topics if topics else ["Other"]
+
+    def _get_user_topics(self, db: AsyncSession) -> list[str]:
+        """Get user's selected topics from documents if they exist."""
+        # Check if documents exist and get their status
+        stmt = select(Document.status).limit(1)
+        try:
+            result = db.execute(stmt)
+            doc = result.scalar_one_or_none()
+            if doc is None:
+                return AML_TOPICS  # Default to all topics
+        except Exception:
+            return AML_TOPICS  # Table doesn't exist, use defaults
+        return AML_TOPICS
 
     async def fetch_newsapi(self, query: str = "money laundering OR AML OR KYC") -> list[dict]:
         """Fetch from NewsAPI."""
@@ -195,6 +207,35 @@ class NewsService:
         await db.commit()
         return count
 
+    async def update_relevance_scores(self, db: AsyncSession) -> int:
+        """Update relevance scores based on topic matching."""
+        # Get user's topics
+        user_topics = self._get_user_topics(db)
+
+        # Get all articles
+        stmt = select(NewsArticle)
+        result = await db.execute(stmt)
+        articles = result.scalars().all()
+
+        count = 0
+        for article in articles:
+            # Check if article topics match user's topics
+            article_topics = article.topics or []
+            matching_topics = set(article_topics) & set(user_topics)
+
+            if not matching_topics:
+                # No matching topics - set low relevance
+                article.relevance_score = 0.0
+            else:
+                # Score based on how many topics match (0-1 scale)
+                relevance = len(matching_topics) / max(len(user_topics), 1)
+                article.relevance_score = min(1.0, relevance)
+
+            count += 1
+
+        await db.commit()
+        return count
+
     async def get_articles(
         self,
         db: AsyncSession,
@@ -211,7 +252,26 @@ class NewsService:
         if topic and topic != "all":
             stmt = stmt.where(NewsArticle.topics.contains([topic]))
 
-        # Get total count
+        # For relevance view, filter to only show articles with relevance > 0
+        if view == "relevance":
+            relevance_stmt = select(NewsArticle).where(
+                NewsArticle.relevance_score > 0
+            )
+            if source and source != "all":
+                relevance_stmt = relevance_stmt.where(NewsArticle.source == source)
+
+            # Get total count
+            count_stmt = select(func.count()).select_from(relevance_stmt.subquery())
+            total_result = await db.execute(count_stmt)
+            total = total_result.scalar() or 0
+
+            relevance_stmt = relevance_stmt.order_by(NewsArticle.relevance_score.desc()).limit(limit)
+            result = await db.execute(relevance_stmt)
+            articles = result.scalars().all()
+
+            return list(articles), total
+
+        # Get total count for other views
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total_result = await db.execute(count_stmt)
         total = total_result.scalar() or 0

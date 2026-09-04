@@ -49,6 +49,12 @@ export async function refreshNews(): Promise<{ articles_fetched: number }> {
   return res.json();
 }
 
+export async function calculateRelevance(): Promise<{ articles_updated: number }> {
+  const res = await fetch(`${API_URL}/api/news/calculate-relevance`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to calculate relevance");
+  return res.json();
+}
+
 export async function getNewsSources(): Promise<NewsSource[]> {
   const res = await fetch(`${API_URL}/api/news/sources/list`);
   if (!res.ok) throw new Error("Failed to fetch sources");
